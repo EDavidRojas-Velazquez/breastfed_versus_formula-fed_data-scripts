@@ -1,0 +1,61 @@
+1.- Download fastq files using ena-file-downloader (execute: ena-file-downloader.jar)
+2.- Quality control:
+	2.1- If you want to take a look of the sequence quality, a small report about quality, number of reads, length, etc. You can use
+    	     FASTQC. Only shows a graphic report and you should do it file by file, otherwise your laptop will crash.
+	2.2- Use trimmomatic for processing and trimming tool for Illumina NGS sequencing data, should be one by one using the following
+	     command line for single end:
+		java -jar trimmomatic-0.39.jar SE -phred33 "D:/breastmilk_Valerie/Metagenome/raw data/fastq/"ERR4142808.fastq.gz 
+                "D:/breastmilk_Valerie/Metagenome/raw data/filtered/"ERR4142808.fastq.gz ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 LEADING:3 
+                TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+
+		java -jar trimmomatic-0.39.jar SE -phred33 "path/folder/"ERR4142808.fastq.gz 
+                "path/folder/"ERR4142808.fastq.gz ILLUMINACLIP:TruSeq3-SE.fa:2:30:10 LEADING:3 
+                TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+		
+	     Paired end: 
+		java -jar trimmomatic-0.35.jar PE -phred33 input_forward.fq.gz input_reverse.fq.gz output_forward_paired.fq.gz 
+                output_forward_unpaired.fq.gz output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz ILLUMINACLIP:TruSeq3-PE.fa:2:30:10 
+                LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36	
+		
+		Note1: according to the technology were used to generate the raw file, you have to copy/paste the correct adapter. For 
+                Illumina HiSeq/MiSeq single end: TruSeq3-SE.fa, for paired end: TruSeq3-PE.fa. The corresponding file should be copied
+		in a folder which contains the folder with the raw files and the folder to store the filtered files. 
+3.-Taxonomic Assignment
+		Install Kraken2 for taxonomy assignment. After that, install bracken for abnundance, kraken2 provides an parcial abundance estimation, but bracken is recommended for this action.
+		The command line for kraken2:
+		kraken2 --db kraken_db --threads 8 --report sample.report --output sample.kraken sample.fastq.gz
+		--db kraken_db → Path to your Kraken2 database.
+		--threads 8 → Number of CPU threads to use.
+		--report sample.report → Summary report file.
+		--output sample.kraken → Detailed classification output.
+		--sample.fastq.gz → Your single-end FASTQ file.
+		In our case: kraken2 --db /home/david/kraken_db --threads 20 --report /home/david/kraken_experiments/kraken_rep/ERR4142808.report --output /home/david/kraken_experiments/			
+				     kraken_rep/ERR4142808.kraken /home/david/kraken_experiments/filtered/ERR4142808.fastq.gz
+		
+		Note: to execute the line for n-samples, run the bash: run_kraken_n.sh (remember to make it executable!!! chmod +x run_kraken_n.sh)
+		Note 2: for paired end files = chmod +x kraken_run_paired.sh
+				     
+		After kraken, we need to filter the result according to the taxonomy level we want, the comand line is:
+		bracken -d /path/to/kraken_db -i ERR4142808.report -o ERR4142808.bracken -r 100 -l S
+		-d /path/to/kraken_db → Path to the same database used by Kraken2.
+		-i ERR4142808.report → Kraken2 report file.
+		-o ERR4142808.bracken → Output file with abundance estimates.
+		-r 100 → Read length (adjust to your actual average read length).
+		-l S → Taxonomic level (D = Domain, P = Phylum, C = Class, O = Order, F = Family, G = Genus, S = Species).
+		In our case: bracken -d /home/david/kraken_db -i /home/david/kraken_experiments/kraken_rep/ERR4142808.report -o /home/david/kraken_experiments/bracken_res/ERR4142808_S.bracken -r 	
+			     100 -l S
+			     
+		Note: to execute the line for n-samples, run the bash: run_bracken_n.sh (remember to make it executable!!! chmod +x run_bracken_n.sh)
+			     
+			     
+		After the process, because we are working with different samples, we need to combine all final bracken results for the final result. We need to use the combine_bracken_outputs.py
+		this file is available to download from: https://github.com/jenniferlu717/Bracken/tree/master/analysis_scripts
+		Once we downloaded, we need to make it executable so we can call it with some necessary parameters:
+		--make it executable: chmod +x combine_bracken_outputs.py
+		-- execute: ./combine_bracken_outputs.py --files filename_*.bracken --output full_taxonomy.tsv
+		* ./combine_bracken_outputs.py → call the script
+		* --files filename_*.bracken → files to combine
+		* --output full_taxonomy.tsv → final result
+		IMPORTANT NOTE: all files should have the same taxonomy level!!!
+		In our case: ./combine_bracken_outputs.py --files /home/david/kraken_experiments/bracken_res/ERR*.bracken --output /home/david/kraken_experiments/full_taxonomy.tsv
+
